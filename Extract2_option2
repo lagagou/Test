@@ -1,0 +1,80 @@
+import pandas as pd
+import numpy as np
+import sqlite3
+from pandas.io import sql
+import subprocess
+
+# Second option, extract data together instead of three table
+
+# In and output file paths
+in_csv = 'searches.csv'
+out_sqlite = 'searchescomp.sqlite'
+
+table_name = 'searches_table' # name for the SQLite database table
+chunksize = 100000 # number of lines to process at each iteration
+
+# columns that should be read from the CSV file
+columns = ['Date','Destination']
+
+# Get number of lines in the CSV file
+nlines = 20390199
+
+# connect to database
+cnx = sqlite3.connect(out_sqlite)
+
+# read
+df = pd.read_csv(in_csv,
+            #header=['arr_port','pax'],  
+            #header=None,  # no header, define column header manually later
+            nrows=chunksize, # number of rows to read at each iteration
+            skiprows=0, # skip rows that were already read
+            sep="^"
+            )
+# get only two columns date and airport
+dfext = df.iloc[:,(0,6)]
+
+# list of airport code
+list_of_values = ['BCN','MAD','AGP']
+
+# get data only from the one in the list
+dfbcn = dfext[dfext['Destination'].isin(list_of_values)]
+
+# push in DB
+sql.to_sql(dfbcn, 
+                name='table_combined', 
+                con=cnx, 
+                if_exists='append')
+# checkpoint
+print ('test')
+
+# Iteratively read CSV and dump lines into the SQLite table
+for i in range(100001, nlines, chunksize):
+
+# Read from csv
+    df2 = pd.read_csv(in_csv,
+            #header=['indd','arr_port','pax'],  
+            #header=None,  # no header, define column header manually later
+            nrows=chunksize, # number of rows to read at each iteration
+            skiprows=i, # skip rows that were already read
+            sep="^"
+            )
+
+# get only two columns date and airport
+    dfext3 = df2.iloc[:,(0,6)]
+    dfext3.columns = ['Date','Destination']
+
+# list of airport code
+    list_of_values2 = ['BCN','MAD','AGP']
+
+# get data only from the one in the list
+    dfbcn2 = dfext3[dfext3['Destination'].isin(list_of_values2)]
+
+# push in DB
+    sql.to_sql(dfbcn2, 
+                name='table_combined', 
+                con=cnx, 
+                if_exists='append')
+    print (i)
+    
+# close connexion
+cnx.close()   
